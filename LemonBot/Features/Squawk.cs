@@ -57,11 +57,16 @@ public class Squawk(DiscordSocketClient client)
             var sayFuckYou = Random.Shared.NextDouble() < Config.Instance!.Squawking.FuckYouResponseChance;
             await SendSquawk(message.Channel, reference, sayFuckYou);
         }
-        else if (Config.Instance!.Squawking.RandomSquawkChannels.Contains(message.Channel.Id) && Random.Shared.NextDouble() < Config.Instance.Squawking.RandomResponseChance)
+        else if (Config.Instance!.Squawking.RandomSquawkChannels.Contains(message.Channel.Id) && 
+                 SaveData.Instance!.NoResponseUntil <= DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond &&
+                 Random.Shared.NextDouble() < Config.Instance.Squawking.RandomResponseChance)
         {
             Console.WriteLine("squawking because someone said something");
+            SaveData.Instance.NoResponseUntil = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond 
+                                                 + Config.Instance.Squawking.ResponseCooldown;
+            ConfigHelpers.SaveConfig(SaveData.Instance, "data.json");
+
             var sayFuckYou = Random.Shared.NextDouble() < Config.Instance.Squawking.FuckYouResponseChance;
-            
             await SendSquawk(message.Channel, reference, sayFuckYou);
         }
     }
@@ -81,7 +86,8 @@ public class Squawk(DiscordSocketClient client)
             }
         }
 
-        await channel.SendMessageAsync(message, messageReference: reference, flags: MessageFlags.SuppressNotification, allowedMentions: AllowedMentions.None);
+        await channel.SendMessageAsync(message, messageReference: reference, 
+            flags: MessageFlags.SuppressNotification, allowedMentions: AllowedMentions.None);
     }
 
     private async void Run()
@@ -89,7 +95,8 @@ public class Squawk(DiscordSocketClient client)
         Console.WriteLine("enabling random squawk");
         while (true)
         {
-            if ((Config.Instance!.Squawking.MinSquawkTime <= 0 && Config.Instance!.Squawking.MaxSquawkTime <= 0) || Config.Instance!.Squawking.MaxSquawkTime < Config.Instance!.Squawking.MinSquawkTime)
+            if ((Config.Instance!.Squawking.MinSquawkTime <= 0 && Config.Instance!.Squawking.MaxSquawkTime <= 0) || 
+                Config.Instance!.Squawking.MaxSquawkTime < Config.Instance!.Squawking.MinSquawkTime)
             {
                 Logger.Warning("random squawk times are invalid!");
                 Console.WriteLine("disabling random squawk");
@@ -128,7 +135,8 @@ public class Squawk(DiscordSocketClient client)
 
             Console.WriteLine("sending random squawk");
             
-            var channelId = Config.Instance.Squawking.RandomSquawkChannels[Random.Shared.Next(0, Config.Instance.Squawking.RandomSquawkChannels.Count)];
+            var channelId = Config.Instance.Squawking.RandomSquawkChannels[Random.Shared.Next(0, 
+                Config.Instance.Squawking.RandomSquawkChannels.Count)];
             var channel = (ISocketMessageChannel) await client.GetChannelAsync(channelId);
             await SendSquawk(channel);
         }

@@ -7,7 +7,7 @@ using LemonBot.Utilities;
 
 _ = new Logger();
 
-Console.WriteLine("LemonBot version 2.0.2");
+Console.WriteLine("LemonBot version 2.1.0");
 Console.WriteLine("Made with love by bloofirephoenix");
 
 if (!ConfigHelpers.InitializeConfig("config.json", out Config.Instance))
