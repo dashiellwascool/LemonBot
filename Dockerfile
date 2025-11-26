@@ -1,19 +1,8 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /source
+FROM rust:latest as builder
+WORKDIR /usr/src/lemonbot
+COPY . .
+RUN cargo install --path .
 
-COPY . ./
-
-# Restore
-RUN dotnet restore
-
-# Build
-RUN dotnet publish -c Release -o /app
-
-# Publish
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS publish
-WORKDIR /app/data
-COPY --from=build /app /app
-
-# Run it
-RUN chmod +x ../LemonBot
-CMD [ "../LemonBot" ]
+FROM debian:stable
+COPY --from=builder /usr/local/cargo/bin/lemonbot /usr/local/bin/lemonbot
+CMD [ "lemonbot" ]
