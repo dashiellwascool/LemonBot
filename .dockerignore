@@ -1,3 +1,5 @@
+.gitignore
+.git/
 /target
 .env
 data.ron

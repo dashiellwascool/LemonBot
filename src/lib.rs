@@ -1,68 +1,43 @@
-use serenity::{all::{Context, CreateMessage, EventHandler, GatewayIntents, Message, MessageFlags, Ready}, async_trait, Client};
-use tracing::{error, info};
+use std::sync::Arc;
 
-use crate::config::Config;
+use serenity::{all::{Context, EventHandler, GatewayIntents, Ready}, async_trait, Client};
+use tokio::sync::RwLock;
+use tracing::info;
+
+use crate::{config::Config, features::squawk::SquawkListener, save_data::SaveData};
 
 pub mod config;
 pub mod save_data;
+pub mod features;
 
-struct DiscordBot {
-    config: Config
-}
+struct DiscordBot;
 
 pub async fn start_bot(config: Config) -> anyhow::Result<()> {
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS;
 
+    let save_data = Arc::new(RwLock::new(SaveData::load_or_default()?));
+    let config = Arc::new(config);
+
+    // read save data
     let mut client = Client::builder(config.token.clone(), intents)
-        .event_handler(DiscordBot {
-            config
-        }).await?;
+        .event_handler(DiscordBot)
+        .event_handler(SquawkListener)
+        .await?;
+
+    {
+        let mut data = client.data.write().await;
+        data.insert::<Config>(config);
+        data.insert::<SaveData>(save_data);
+    }
 
     client.start().await?;
+
     Ok(())
 }
 
 #[async_trait]
 impl EventHandler for DiscordBot {
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, _: Context, _: Ready) {
         info!("Ready!");
     }
-
-    async fn message(&self, ctx: Context, message: Message) {
-        if message.author.bot {
-            return;
-        }
-
-        match message.mentions_me(&ctx.http).await {
-            Ok(mentions_me) => {
-                if mentions_me {
-                    info!("squawking because i was mentioned");
-                    let reply = get_squawk_message(&self.config).reference_message(&message);
-                    if let Err(e) = message.channel_id.send_message(ctx.http, reply).await {
-                        error!("failed to reply to message: {e}");
-                    }
-                    return;
-                }
-            },
-            Err(e) => error!("failed mentions me check on new message: {e}")
-        }
-
-        if rand::random_range(0.0..=1.0) < self.config.squawk_response_chance {
-            info!("squawking because random squawk chance");
-            let reply = get_squawk_message(&self.config).reference_message(&message);
-            if let Err(e) = message.channel_id.send_message(ctx.http, reply).await {
-                error!("failed to reply to message: {e}");
-            }
-        }
-    }
 }
-
-fn get_squawk_message(config: &Config) -> CreateMessage {
-    let msg = if rand::random_range(0.0..=1.0) < config.fuk_u_chance {
-        "fuk u"
-    } else {
-        "squawk"
-    };
-    CreateMessage::new().content(msg).flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
-}
-
