@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use serenity::{all::{ChannelId, Context, CreateMessage, EventHandler, Http, Message, MessageFlags, Ready}, async_trait};
+use serenity::{all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, EventHandler, Http, Message, MessageFlags, Ready}, async_trait};
 use tokio::{sync::RwLock, time::sleep};
 use tracing::{error, info, warn};
 
@@ -104,7 +104,7 @@ pub async fn self_squawk_task(config: Arc<Config>, data: Arc<RwLock<SaveData>>, 
         let now = Utc::now();
 
         if now < next_squawk {
-            info!("Next self squawk in {}", (next_squawk - now));
+            info!("Next self squawk is on {}", next_squawk.naive_local());
             sleep((next_squawk - now).to_std().expect("next squawk will be in the future")).await;
         }
 
@@ -140,6 +140,6 @@ fn get_squawk_message(config: &Config) -> CreateMessage {
     } else {
         SQUAWK
     };
-    CreateMessage::new().content(msg).flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
+    CreateMessage::new().content(msg).flags(MessageFlags::SUPPRESS_NOTIFICATIONS).allowed_mentions(CreateAllowedMentions::new().all_users(false))
 }
 
