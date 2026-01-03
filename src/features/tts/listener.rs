@@ -3,12 +3,11 @@ use serenity::{
     async_trait,
     prelude::*,
 };
-use tracing::info;
 
 use crate::{
     config::Config,
     features::tts::{
-        commands::leave, get_tts, queue::{QueuedMessage, TTSSenders}, vc::leave_vc
+        queue::{QueuedMessage, TTSSenders}, vc::leave_vc
     },
 };
 

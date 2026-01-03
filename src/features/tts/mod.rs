@@ -1,17 +1,8 @@
 use poise::CreateReply;
 use serde_json::json;
-use serenity::all::Context;
-use songbird::{
-    id::{ChannelId, GuildId},
-    input::{Input, codecs::get_codec_registry},
-};
+use songbird::input::{Input, codecs::get_codec_registry};
 use symphonia::default::get_probe;
-use tokio::sync::mpsc;
 
-use crate::{
-    config::Config,
-    features::tts::queue::{QueuedMessage, TTSSenders},
-};
 
 pub mod commands;
 pub mod listener;

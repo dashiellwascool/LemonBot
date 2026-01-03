@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use poise::{Framework, FrameworkOptions};
 use serenity::{
-    all::{Context, EventHandler, GatewayIntents, Ready}, async_trait, futures::lock::Mutex, Client
+    all::{Context, EventHandler, GatewayIntents, Ready}, async_trait, Client
 };
 use songbird::SerenityInit;
 use tokio::sync::RwLock;
