@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use poise::CreateReply;
+use serde::Serialize;
 use serde_json::json;
 use songbird::input::{Input, codecs::get_codec_registry};
 use symphonia::default::get_probe;
@@ -19,13 +22,41 @@ fn make_ephemeral_reply(msg: &str) -> CreateReply {
     CreateReply::default().ephemeral(true).content(msg)
 }
 
-async fn get_tts(msg: &str, server: &str, client: &reqwest::Client) -> anyhow::Result<Input> {
-    let body = json!({
-        "text": msg,
-        "length_scale": 1,
-        "noise_scale": 0.666,
-        "noise_w_scale": 0.8
-    });
+#[derive(Serialize)]
+struct TTSBody {
+    text: String,
+    length_scale: u32,
+    noise_scale: f32,
+    noise_w_scale: f32,
+    speaker: Option<String>,
+    model: Option<String>,
+}
+
+async fn get_tts(
+    msg: &str,
+    model: Option<String>,
+    speaker: Option<String>,
+    server: &str,
+    client: &reqwest::Client,
+) -> anyhow::Result<Input> {
+    let body = match speaker {
+        Some(_) => TTSBody {
+            text: msg.to_string(),
+            length_scale: 1,
+            model,
+            speaker,
+            noise_scale: 0.333,
+            noise_w_scale: 0.333,
+        },
+        None => TTSBody {
+            text: msg.to_string(),
+            length_scale: 1,
+            model,
+            speaker,
+            noise_scale: 0.666,
+            noise_w_scale: 0.8,
+        },
+    };
 
     let resp = client.post(server).json(&body).send().await?;
 

@@ -14,7 +14,9 @@ pub struct Config {
     pub squawk_blacklist_channels: Vec<u64>,
 
     pub tts_channels: Vec<u64>,
-    pub piper_server: String
+    pub piper_server: String,
+
+    pub postgres_url: String
 }
 
 impl TypeMapKey for Config {
@@ -32,7 +34,8 @@ impl Config {
             random_squawk_channels: var_list("RANDOM_SQUAWK_CHANNELS")?,
             squawk_blacklist_channels: var_list("SQUAWK_BLACKLIST_CHANNELS")?,
             tts_channels: var_list("TTS_CHANNELS")?,
-            piper_server: var_or_default("PIPER_SERVER", || "http://localhost:5000".to_string())?
+            piper_server: var_or_default("PIPER_SERVER", || "http://localhost:5000".to_string())?,
+            postgres_url: var_or_secret("POSTGRES_URL", "POSTGRES_URL_SECRET_PATH")?
         })
     }
 }

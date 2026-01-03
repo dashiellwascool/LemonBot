@@ -9,17 +9,16 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::{
-    config::Config,
-    features::{
+    config::Config, database::{make_db_pool, migrate_db, DatabaseKey}, features::{
         squawk::SquawkListener,
         tts::{self, listener::TTSListener, queue::TTSSenders},
-    },
-    save_data::SaveData,
+    }, save_data::SaveData
 };
 
 pub mod config;
 pub mod features;
 pub mod save_data;
+pub mod database;
 
 struct DiscordBot;
 
@@ -30,9 +29,14 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
     let save_data = Arc::new(RwLock::new(SaveData::load_or_default()?));
     let config = Arc::new(config);
 
+    // init database
+    let db = make_db_pool(&config).await?;
+    migrate_db(&db).await?;
+
+    // init poise
     let poise_framework = Framework::builder()
         .options(FrameworkOptions {
-            commands: vec![tts::commands::join(), tts::commands::leave()],
+            commands: vec![tts::commands::join(), tts::commands::leave(), tts::commands::set_nick()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
@@ -43,6 +47,7 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
         })
         .build();
 
+    // init client
     let mut client = Client::builder(config.token.clone(), intents)
         .event_handler(DiscordBot)
         .event_handler(SquawkListener)
@@ -51,11 +56,12 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
         .register_songbird()
         .await?;
 
-    {
+    { // insert everything
         let mut data = client.data.write().await;
         data.insert::<Config>(config);
         data.insert::<SaveData>(save_data);
         data.insert::<TTSSenders>(Default::default());
+        data.insert::<DatabaseKey>(Arc::new(db));
     }
 
     client.start().await?;

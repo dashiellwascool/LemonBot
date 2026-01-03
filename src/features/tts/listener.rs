@@ -97,6 +97,7 @@ impl EventHandler for TTSListener {
 
                 _ = sender
                     .send(TTSMessage {
+                        author_id: message.author.id.get(),
                         author: name,
                         message: message.content,
                     })

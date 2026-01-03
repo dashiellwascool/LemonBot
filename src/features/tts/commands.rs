@@ -1,9 +1,8 @@
 use poise::command;
 
-use crate::features::tts::{
-    PoiseContext, make_ephemeral_reply,
-    vc::{get_songbird, join_vc, leave_vc},
-};
+use crate::{database::{self, DatabaseKey}, features::tts::{
+    make_ephemeral_reply, vc::{get_songbird, join_vc, leave_vc}, PoiseContext
+}};
 
 #[command(slash_command, guild_only)]
 pub async fn join(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
@@ -96,6 +95,19 @@ pub async fn leave(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
         "You are not in the same VC as the bot",
     ))
     .await?;
+
+    Ok(())
+}
+
+#[command(slash_command)]
+pub async fn set_nick(ctx: PoiseContext<'_>, nick: Option<String>) -> Result<(), anyhow::Error> {
+    let db = {
+        let data = ctx.serenity_context().data.read().await;
+        data.get::<DatabaseKey>().expect("Database is initialized").clone()
+    };
+    database::set_nick(&db, ctx.author().id.get(), nick).await?;
+
+    ctx.send(make_ephemeral_reply(":thumpsup:")).await?;
 
     Ok(())
 }
