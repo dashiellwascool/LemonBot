@@ -1,7 +1,8 @@
 use poise::command;
 
 use crate::features::tts::{
-    make_ephemeral_reply, vc::{get_songbird, join_vc, leave_vc}, PoiseContext
+    PoiseContext, make_ephemeral_reply,
+    vc::{get_songbird, join_vc, leave_vc},
 };
 
 #[command(slash_command, guild_only)]
@@ -18,7 +19,8 @@ pub async fn join(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
         ctx.send(make_ephemeral_reply("You are not in a VC"))
             .await?;
         return Ok(());
-    }.into();
+    }
+    .into();
     let guild = ctx.guild().expect("we are in a guild").id.into();
 
     let songbird = get_songbird(ctx.serenity_context()).await;
@@ -27,10 +29,12 @@ pub async fn join(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
             let handle = lock.lock().await;
             if let Some(id) = handle.current_channel() {
                 if id != vc {
-                    ctx.send(make_ephemeral_reply("I'm currently in a VC")).await?;
+                    ctx.send(make_ephemeral_reply("I'm currently in a VC"))
+                        .await?;
                     return Ok(());
                 } else {
-                    ctx.send(make_ephemeral_reply("I'm already in that VC")).await?;
+                    ctx.send(make_ephemeral_reply("I'm already in that VC"))
+                        .await?;
                     return Ok(());
                 }
             }

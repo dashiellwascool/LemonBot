@@ -78,13 +78,14 @@ impl EventHandler for TTSListener {
                 // get the name
 
                 // >_<
-                let author_member = ctx.http
-                        .get_guild(message.guild_id.expect("we are in a guld"))
-                        .await
-                        .expect("we are in a guild")
-                        .member(&ctx.http, message.author.id)
-                        .await
-                        .expect("the member sent a message");
+                let author_member = ctx
+                    .http
+                    .get_guild(message.guild_id.expect("we are in a guld"))
+                    .await
+                    .expect("we are in a guild")
+                    .member(&ctx.http, message.author.id)
+                    .await
+                    .expect("the member sent a message");
 
                 let name = if let Some(nick) = author_member.nick {
                     nick

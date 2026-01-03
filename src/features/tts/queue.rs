@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use serenity::{futures::lock::Mutex, prelude::TypeMapKey};
 use songbird::{Songbird, id::GuildId};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::features::tts::get_tts;
 
@@ -26,6 +26,8 @@ pub(super) async fn speak_message_queue(
     tts_url: String,
 ) {
     info!("Starting message queue for {guild_id}");
+
+    let mut last_author: Option<String> = None;
     loop {
         match rx.recv().await {
             Some(message) => {
@@ -33,8 +35,22 @@ pub(super) async fn speak_message_queue(
                     // assume we should play the audio if we are recieving these messages
 
                     // create the audio
-                    let message = format!("{} said. {}", message.author, message.message);
-                    let tts = get_tts(&message, &tts_url).await;
+                    let mut author_prefix = format!("{} said. ", message.author);
+                    if let Some(last_author) = &last_author
+                        && *last_author == message.author
+                    {
+                        author_prefix = String::new();
+                    }
+                    last_author = Some(message.author);
+
+                    let message = format!("{}{}", author_prefix, message.message);
+                    let tts = match get_tts(&message, &tts_url, &reqwest::Client::new()).await {
+                        Ok(i) => i,
+                        Err(e) => {
+                            error!("Error getting tts message! {e}");
+                            continue;
+                        }
+                    };
 
                     // play the audio
                     let mut handle = lock.lock().await;
