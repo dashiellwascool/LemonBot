@@ -5,7 +5,7 @@ use thiserror::Error;
 use serenity::prelude::*;
 use tokio::sync::mpsc;
 
-use crate::{config::Config, features::tts::queue::{self, QueuedMessage, TTSSenders}};
+use crate::{config::Config, features::tts::queue::{self, TTSMessage, TTSSenders}};
 
 pub async fn get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx).await.expect("Songbird is already initialized")
@@ -27,7 +27,7 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
         )
     };
 
-    let (tx, rx) = mpsc::channel::<QueuedMessage>(10);
+    let (tx, rx) = mpsc::channel::<TTSMessage>(10);
     tokio::task::spawn(queue::speak_message_queue(
         songbird.clone(),
         rx,

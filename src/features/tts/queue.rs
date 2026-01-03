@@ -10,18 +10,18 @@ use crate::features::tts::get_tts;
 pub struct TTSSenders;
 
 impl TypeMapKey for TTSSenders {
-    type Value = Arc<Mutex<HashMap<GuildId, Sender<QueuedMessage>>>>;
+    type Value = Arc<Mutex<HashMap<GuildId, Sender<TTSMessage>>>>;
 }
 
 #[derive(Clone)]
-pub struct QueuedMessage {
+pub struct TTSMessage {
     pub author: String,
     pub message: String,
 }
 
 pub(super) async fn speak_message_queue(
     songbird: Arc<Songbird>,
-    mut rx: Receiver<QueuedMessage>,
+    mut rx: Receiver<TTSMessage>,
     guild_id: GuildId,
     tts_url: String,
 ) {

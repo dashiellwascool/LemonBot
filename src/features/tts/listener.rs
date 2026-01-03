@@ -7,7 +7,8 @@ use serenity::{
 use crate::{
     config::Config,
     features::tts::{
-        queue::{QueuedMessage, TTSSenders}, vc::leave_vc
+        queue::{TTSMessage, TTSSenders},
+        vc::leave_vc,
     },
 };
 
@@ -74,9 +75,28 @@ impl EventHandler for TTSListener {
             let senders = senders_lock.lock().await;
             if let Some(sender) = senders.get(&message.guild_id.expect("we are in a guild").into())
             {
+                // get the name
+
+                // >_<
+                let author_member = ctx.http
+                        .get_guild(message.guild_id.expect("we are in a guld"))
+                        .await
+                        .expect("we are in a guild")
+                        .member(&ctx.http, message.author.id)
+                        .await
+                        .expect("the member sent a message");
+
+                let name = if let Some(nick) = author_member.nick {
+                    nick
+                } else if let Some(global_nick) = &message.author.global_name {
+                    global_nick.clone()
+                } else {
+                    message.author.name.clone()
+                };
+
                 _ = sender
-                    .send(QueuedMessage {
-                        author: message.author.name,
+                    .send(TTSMessage {
+                        author: name,
                         message: message.content,
                     })
                     .await;
