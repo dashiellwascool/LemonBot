@@ -11,8 +11,10 @@ pub struct Config {
 
     pub max_random_squawk_time: i64,
     pub random_squawk_channels: Vec<u64>,
-    pub squawk_blacklist_channels: Vec<u64>
+    pub squawk_blacklist_channels: Vec<u64>,
 
+    pub tts_channels: Vec<u64>,
+    pub piper_server: String
 }
 
 impl TypeMapKey for Config {
@@ -28,7 +30,9 @@ impl Config {
             squawk_cooldown: var_or_default("SQUAWK_COOLDOWN", || 604800)?,
             max_random_squawk_time: var_or_default("MAX_RANDOM_SQUAWK_TIME", || 2629746)?,
             random_squawk_channels: var_list("RANDOM_SQUAWK_CHANNELS")?,
-            squawk_blacklist_channels: var_list("SQUAWK_BLACKLIST_CHANNELS")?
+            squawk_blacklist_channels: var_list("SQUAWK_BLACKLIST_CHANNELS")?,
+            tts_channels: var_list("TTS_CHANNELS")?,
+            piper_server: var_or_default("PIPER_SERVER", || "http://localhost:5000".to_string())?
         })
     }
 }
