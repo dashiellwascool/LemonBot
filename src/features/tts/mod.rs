@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use poise::CreateReply;
 use serde::Serialize;
-use serde_json::json;
 use songbird::input::{Input, codecs::get_codec_registry};
 use symphonia::default::get_probe;
 
@@ -13,11 +10,6 @@ mod vc;
 
 type PoiseContext<'a> = poise::Context<'a, (), anyhow::Error>;
 
-//#[derive(Deserialize, Debug)]
-//struct VoicesResponse {
-//    speaker_id_map: HashMap<String, i32>,
-//}
-
 fn make_ephemeral_reply(msg: &str) -> CreateReply {
     CreateReply::default().ephemeral(true).content(msg)
 }
@@ -25,11 +17,8 @@ fn make_ephemeral_reply(msg: &str) -> CreateReply {
 #[derive(Serialize)]
 struct TTSBody {
     text: String,
-    length_scale: u32,
-    noise_scale: f32,
-    noise_w_scale: f32,
-    speaker: Option<String>,
     model: Option<String>,
+    speaker: Option<String>,
 }
 
 async fn get_tts(
@@ -39,26 +28,17 @@ async fn get_tts(
     server: &str,
     client: &reqwest::Client,
 ) -> anyhow::Result<Input> {
-    let body = match speaker {
-        Some(_) => TTSBody {
-            text: msg.to_string(),
-            length_scale: 1,
-            model,
-            speaker,
-            noise_scale: 0.333,
-            noise_w_scale: 0.333,
-        },
-        None => TTSBody {
-            text: msg.to_string(),
-            length_scale: 1,
-            model,
-            speaker,
-            noise_scale: 0.666,
-            noise_w_scale: 0.8,
-        },
+    let body = TTSBody {
+        text: msg.to_string(),
+        model,
+        speaker,
     };
 
-    let resp = client.post(server).json(&body).send().await?;
+    let resp = client
+        .get(format!("{server}/speak"))
+        .json(&body)
+        .send()
+        .await?;
 
     let input: Input = resp.bytes().await.expect("response bytes").into();
 
@@ -67,32 +47,24 @@ async fn get_tts(
         .await?)
 }
 
-//async fn get_voices(
-//    server: &str,
-//    client: &reqwest::Client,
-//) -> anyhow::Result<HashMap<String, Vec<String>>> {
-//    let mut voices = HashMap::new();
-//
-//    let resp = client.get(format!("{server}/voices")).send().await?;
-//    let response_voices: HashMap<String, VoicesResponse> = resp.json().await?;
-//
-//    for (model, voice) in response_voices {
-//        if !voice.speaker_id_map.is_empty() {
-//            for (speaker, _) in voice.speaker_id_map {
-//                let voice = Voice {
-//                    model: model.clone(),
-//                    speaker: Some(speaker),
-//                };
-//                voices.insert(voice.get_name(), voice);
-//            }
-//        } else {
-//            let voice = Voice {
-//                model: model.clone(),
-//                speaker: None,
-//            };
-//            voices.insert(voice.get_name(), voice);
-//        }
-//    }
-//
-//    Ok(voices)
-//}
+async fn get_models(server: &str, client: &reqwest::Client) -> anyhow::Result<Vec<String>> {
+    let resp = client.get(format!("{server}/models")).send().await?;
+    let voices: Vec<String> = resp.json().await?;
+
+    Ok(voices)
+}
+
+async fn get_speakers(
+    server: &str,
+    client: &reqwest::Client,
+    model: Option<String>,
+) -> anyhow::Result<Vec<String>> {
+    let url = match model {
+        Some(model) => format!("{server}/speakers?model={model}"),
+        None => format!("{server}/speakers"),
+    };
+    let resp = client.get(url).send().await?;
+    let voices: Vec<String> = resp.json().await?;
+
+    Ok(voices)
+}

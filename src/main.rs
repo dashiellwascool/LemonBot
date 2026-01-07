@@ -6,7 +6,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().init();
 
     info!("Lemon Bot v{}", env!("CARGO_PKG_VERSION"));
-    info!("Made with love by Dashiell ♥");
+    info!("Made with ❤ by Dashiell");
 
     _ = dotenvy::dotenv();
 

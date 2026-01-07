@@ -36,7 +36,7 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
     // init poise
     let poise_framework = Framework::builder()
         .options(FrameworkOptions {
-            commands: vec![tts::commands::join(), tts::commands::leave(), tts::commands::set_nick()],
+            commands: vec![tts::commands::join(), tts::commands::leave(), tts::commands::set_nick(), tts::commands::set_model(), tts::commands::set_speaker()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {

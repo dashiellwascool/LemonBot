@@ -33,10 +33,11 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
     let (tx, rx) = mpsc::channel::<TTSMessage>(10);
     tokio::task::spawn(queue::speak_message_queue(
         songbird.clone(),
+        config.reqwest_client.clone(),
         rx,
         guild,
         config.piper_server.clone(),
-        db
+        db,
     ));
 
     // put the sender in the senders map

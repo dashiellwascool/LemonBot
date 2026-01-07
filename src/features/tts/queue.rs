@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use reqwest::Client;
 use serenity::{futures::lock::Mutex, prelude::TypeMapKey};
 use songbird::{Songbird, id::GuildId};
 use sqlx::{Pool, Postgres};
@@ -23,6 +24,7 @@ pub struct TTSMessage {
 
 pub(super) async fn speak_message_queue(
     songbird: Arc<Songbird>,
+    client: Arc<Client>,
     mut rx: Receiver<TTSMessage>,
     guild_id: GuildId,
     tts_url: String,
@@ -58,7 +60,7 @@ pub(super) async fn speak_message_queue(
                     last_author = Some(message.author);
 
                     let message = format!("{}{}", author_prefix, message.message);
-                    let tts = match get_tts(&message, user.model, user.speaker, &tts_url, &reqwest::Client::new()).await {
+                    let tts = match get_tts(&message, user.model, user.speaker, &tts_url, &client).await {
                         Ok(i) => i,
                         Err(e) => {
                             error!("Error getting tts message! {e}");

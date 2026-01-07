@@ -65,3 +65,21 @@ pub async fn set_nick(db: &Pool<Postgres>, user_id: u64, nick: Option<String>) -
         .await?;
     Ok(())
 }
+
+pub async fn set_model(db: &Pool<Postgres>, user_id: u64, model: Option<String>) -> anyhow::Result<()> {
+    sqlx::query("INSERT INTO TTSUsers (discord_id, model, speaker) VALUES ($1, $2, NULL) ON CONFLICT (discord_id) DO UPDATE SET discord_id=$1, model=$2, speaker=NULL;")
+        .bind(user_id as i64)
+        .bind(model)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+pub async fn set_speaker(db: &Pool<Postgres>, user_id: u64, speaker: Option<String>) -> anyhow::Result<()> {
+    sqlx::query("INSERT INTO TTSUsers (discord_id, speaker) VALUES ($1, $2) ON CONFLICT (discord_id) DO UPDATE SET discord_id=$1, speaker=$2;")
+        .bind(user_id as i64)
+        .bind(speaker)
+        .execute(db)
+        .await?;
+    Ok(())
+}

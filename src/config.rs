@@ -1,5 +1,6 @@
 use std::{env, fs, io, str::FromStr, sync::Arc};
 
+use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serenity::prelude::TypeMapKey;
 
@@ -16,7 +17,8 @@ pub struct Config {
     pub tts_channels: Vec<u64>,
     pub piper_server: String,
 
-    pub postgres_url: String
+    pub postgres_url: String,
+    pub reqwest_client: Arc<Client>
 }
 
 impl TypeMapKey for Config {
@@ -35,7 +37,8 @@ impl Config {
             squawk_blacklist_channels: var_list("SQUAWK_BLACKLIST_CHANNELS")?,
             tts_channels: var_list("TTS_CHANNELS")?,
             piper_server: var_or_default("PIPER_SERVER", || "http://localhost:5000".to_string())?,
-            postgres_url: var_or_secret("POSTGRES_URL", "POSTGRES_URL_SECRET_PATH")?
+            postgres_url: var_or_secret("POSTGRES_URL", "POSTGRES_URL_SECRET_PATH")?,
+            reqwest_client: Arc::new(Client::new())
         })
     }
 }
