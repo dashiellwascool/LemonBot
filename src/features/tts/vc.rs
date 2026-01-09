@@ -38,6 +38,7 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
         guild,
         config.piper_server.clone(),
         db,
+        ctx.http.clone()
     ));
 
     // put the sender in the senders map

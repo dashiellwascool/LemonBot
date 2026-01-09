@@ -16,6 +16,11 @@ pub struct TTSListener;
 #[async_trait]
 impl EventHandler for TTSListener {
     async fn message(&self, ctx: Context, message: Message) {
+        // do not read tts from bots
+        if message.author.bot {
+            return;
+        }
+
         // get the guild the message was in
         let guild = if let Some(g) = message.guild(&ctx.cache) {
             g
@@ -23,6 +28,26 @@ impl EventHandler for TTSListener {
             return;
         }
         .clone();
+
+        // get songbird
+        let songbird = songbird::get(&ctx)
+            .await
+            .expect("Songbird has been initialized");
+        let songbird = if let Some(handle) = songbird.get(guild.id) {
+            handle
+        } else {
+            return;
+        };
+
+        let bot_channel = {
+            let songbird = songbird.lock().await;
+            let channel = songbird.current_channel();
+            if let Some(channel) = channel {
+                channel
+            } else {
+                return;
+            }
+        };
 
         // check if the message was sent in a tts channel
         let config = {
@@ -33,7 +58,7 @@ impl EventHandler for TTSListener {
                 .clone()
         };
 
-        if !config.tts_channels.contains(&message.channel_id.get()) {
+        if !config.tts_channels.contains(&message.channel_id.get()) && message.channel_id.get() != bot_channel.0.get() {
             return;
         }
 
@@ -45,26 +70,8 @@ impl EventHandler for TTSListener {
         };
 
         // now let's check if we are in the same vc
-        let songbird = songbird::get(&ctx)
-            .await
-            .expect("Songbird has been initialized");
-        let songbird = if let Some(handle) = songbird.get(guild.id) {
-            handle
-        } else {
-            return;
-        };
-        let same_vc = {
-            let songbird = songbird.lock().await;
-            if let Some(bot_vc) = songbird.current_channel()
-                && bot_vc.0.get() == user_vc.get()
-            {
-                true
-            } else {
-                false
-            }
-        };
 
-        if same_vc {
+        if bot_channel.0.get() == user_vc.get() {
             // get the sender and queue the message
             let senders_lock = {
                 let data = ctx.data.read().await;
@@ -75,30 +82,10 @@ impl EventHandler for TTSListener {
             let senders = senders_lock.lock().await;
             if let Some(sender) = senders.get(&message.guild_id.expect("we are in a guild").into())
             {
-                // get the name
-
-                // >_<
-                let author_member = ctx
-                    .http
-                    .get_guild(message.guild_id.expect("we are in a guld"))
-                    .await
-                    .expect("we are in a guild")
-                    .member(&ctx.http, message.author.id)
-                    .await
-                    .expect("the member sent a message");
-
-                let name = if let Some(nick) = author_member.nick {
-                    nick
-                } else if let Some(global_nick) = &message.author.global_name {
-                    global_nick.clone()
-                } else {
-                    message.author.name.clone()
-                };
-
                 _ = sender
                     .send(TTSMessage {
                         author_id: message.author.id.get(),
-                        author: name,
+                        guild: message.guild_id.expect("we are in a guild").get(),
                         message: message.content,
                     })
                     .await;
