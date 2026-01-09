@@ -67,9 +67,9 @@ fn var_list<T: DeserializeOwned>(var: &str) -> Result<Vec<T>, ConfigError> {
     }
 }
 
-fn var_or_none<T: DeserializeOwned>(var: &str) -> Result<Option<T>, ConfigError> {
+fn var_or_none<T: FromStr>(var: &str) -> Result<Option<T>, ConfigError> {
     if let Ok(s) = env::var(var) {
-        match serde_json::from_str(&s) {
+        match T::from_str(&s) {
             Ok(v) => Ok(Some(v)),
             Err(_) => Err(ConfigError::BadVar(var.to_string()))
         }

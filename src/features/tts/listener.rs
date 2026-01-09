@@ -96,10 +96,6 @@ impl EventHandler for TTSListener {
     async fn voice_state_update(&self, ctx: Context, _old: Option<VoiceState>, new: VoiceState) {
         // Leave the call if we are in one and it is only us in it
 
-        if new.channel_id.is_some() {
-            // we only need to check if someone just left the VC
-            return;
-        }
         let guild = if let Some(g) = new.guild_id {
             g
         } else {
