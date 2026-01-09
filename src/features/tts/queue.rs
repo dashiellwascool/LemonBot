@@ -4,7 +4,7 @@ use linkify::LinkFinder;
 use reqwest::Client;
 use serde_json::error::Category;
 use serenity::{
-    all::{Cache, ContentSafeOptions, Http, content_safe},
+    all::{content_safe, Cache, ContentSafeOptions, Http, Message},
     futures::lock::Mutex,
     prelude::TypeMapKey,
 };
@@ -21,21 +21,14 @@ use crate::{
 pub struct TTSSenders;
 
 impl TypeMapKey for TTSSenders {
-    type Value = Arc<Mutex<HashMap<GuildId, Sender<TTSMessage>>>>;
-}
-
-#[derive(Clone)]
-pub struct TTSMessage {
-    pub author_id: u64,
-    pub guild: u64,
-    pub message: String,
+    type Value = Arc<Mutex<HashMap<GuildId, Sender<Message>>>>;
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn speak_message_queue(
     songbird: Arc<Songbird>,
     client: Arc<Client>,
-    mut rx: Receiver<TTSMessage>,
+    mut rx: Receiver<Message>,
     guild_id: GuildId,
     tts_url: String,
     db: Arc<Pool<Postgres>>,
@@ -58,22 +51,22 @@ pub(super) async fn speak_message_queue(
 
         // proces sand clean the message
         let content: String = LinkFinder::new()
-            .spans(&message.message)
+            .spans(&message.content)
             .filter(|s| s.kind().is_none())
             .map(|s| s.as_str())
             .collect();
 
-        let has_link = content != message.message;
+        let has_link = content != message.content;
 
         let content = content_safe(
             &cache,
             content,
-            &ContentSafeOptions::new().display_as_member_from(message.guild),
+            &ContentSafeOptions::new().display_as_member_from(message.guild_id.expect("we are in a guild")),
             &[],
         );
 
         // get all the info we need
-        let user = match get_tts_user(&db, message.author_id).await {
+        let user = match get_tts_user(&db, message.author.id.get()).await {
             Ok(u) => u,
             Err(e) => {
                 error!("Database error! {e}");
@@ -81,14 +74,7 @@ pub(super) async fn speak_message_queue(
             }
         };
 
-        let author_name =
-            match get_author_name(&http, &user, message.guild, message.author_id).await {
-                Ok(m) => m,
-                Err(e) => {
-                    error!("failed to get author name for {}: {e}", message.author_id);
-                    continue;
-                }
-            };
+        let author_name = get_author_name(&cache, &http, &user, &message).await;
 
         // create the audio
         let message = {
@@ -128,27 +114,28 @@ pub(super) async fn speak_message_queue(
 /// Attempts to get the name of a discord account with the following priority:
 /// TTS nickname, guild nickname, global nickname, username
 async fn get_author_name(
+    cache: &Arc<Cache>,
     http: &Http,
     tts_user: &TTSUser,
-    guild_id: u64,
-    user_id: u64,
-) -> anyhow::Result<String> {
+    message: &Message
+) -> String {
     // try TTS nickname
     if let Some(nick) = &tts_user.nick {
-        return Ok(nick.to_string());
+        return nick.to_string();
     }
 
     // try guild nickname
-    let member = http.get_member(guild_id.into(), user_id.into()).await?;
-    if let Some(nick) = member.nick {
-        return Ok(nick);
+    if let Ok(m) = message.member((cache, http)).await {
+        if let Some(nick) = m.nick {
+            return nick;
+        }
     }
 
     // global nickname
-    if let Some(nick) = member.user.global_name {
-        return Ok(nick);
+    if let Some(nick) = &message.author.global_name {
+        return nick.clone();
     }
 
     // username
-    Ok(member.user.name)
+    message.author.name.clone()
 }

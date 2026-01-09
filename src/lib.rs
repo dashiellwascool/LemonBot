@@ -55,6 +55,7 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
                     tts::commands::set_nick(),
                     tts::commands::set_model(),
                     tts::commands::set_speaker(),
+                    tts::commands::view_models()
                 ],
                 ..Default::default()
             })

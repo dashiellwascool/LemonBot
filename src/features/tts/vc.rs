@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use songbird::{error::JoinError, id::{ChannelId, GuildId}, Songbird};
 use thiserror::Error;
-use serenity::prelude::*;
+use serenity::{all::Message, prelude::*};
 use tokio::sync::mpsc;
 
-use crate::{config::Config, database::DatabaseKey, features::tts::queue::{self, TTSMessage, TTSSenders}};
+use crate::{config::Config, database::DatabaseKey, features::tts::queue::{self, TTSSenders}};
 
 pub async fn get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx).await.expect("Songbird is already initialized")
@@ -30,7 +30,7 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
         )
     };
 
-    let (tx, rx) = mpsc::channel::<TTSMessage>(10);
+    let (tx, rx) = mpsc::channel::<Message>(10);
     tokio::task::spawn(queue::speak_message_queue(
         songbird.clone(),
         config.reqwest_client.clone(),

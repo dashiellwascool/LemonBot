@@ -8,7 +8,7 @@ use tracing::info;
 use crate::{
     config::Config,
     features::tts::{
-        queue::{TTSMessage, TTSSenders},
+        queue::TTSSenders,
         vc::leave_vc,
     },
 };
@@ -29,6 +29,8 @@ impl EventHandler for TTSListener {
             return;
         }
         .clone();
+
+        info!("{} {:?}", message.author.name, message.author.global_name);
 
         // get songbird
         let songbird = songbird::get(&ctx)
@@ -84,11 +86,7 @@ impl EventHandler for TTSListener {
             if let Some(sender) = senders.get(&message.guild_id.expect("we are in a guild").into())
             {
                 _ = sender
-                    .send(TTSMessage {
-                        author_id: message.author.id.get(),
-                        guild: message.guild_id.expect("we are in a guild").get(),
-                        message: message.content,
-                    })
+                    .send(message)
                     .await;
             }
         }
