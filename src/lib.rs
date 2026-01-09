@@ -55,7 +55,8 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
                     tts::commands::set_nick(),
                     tts::commands::set_model(),
                     tts::commands::set_speaker(),
-                    tts::commands::view_models()
+                    tts::commands::view_models(),
+                    tts::commands::view_speakers()
                 ],
                 ..Default::default()
             })
@@ -71,6 +72,8 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
         client = client
             .framework(poise_framework)
             .event_handler(TTSListener)
+            .event_handler(tts::commands::view_models::ViewModelsListener)
+            .event_handler(tts::commands::view_speakers::ViewSpeakersListener)
             .register_songbird();
     } else {
         warn!("PIPER_SERVER not set. TTS will not be enabled");

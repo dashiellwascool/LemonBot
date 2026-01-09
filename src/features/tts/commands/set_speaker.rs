@@ -27,7 +27,7 @@ pub async fn set_speaker(
         )
         .await?;
 
-        if !speakers.contains(speaker) {
+        if !speakers.speakers.contains(speaker) {
             ctx.send(make_ephemeral_reply("That isn't a valid speaker"))
                 .await?;
             return Ok(());
@@ -86,7 +86,7 @@ async fn autocomplete_speaker(
             Default::default()
         }
         Ok(m) => {
-            let mut m: Vec<&String> = m
+            let mut m: Vec<&String> = m.speakers
                 .iter()
                 .filter(|x| x.to_lowercase().starts_with(partial))
                 .collect();

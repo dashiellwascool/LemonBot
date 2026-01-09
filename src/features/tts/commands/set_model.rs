@@ -61,7 +61,7 @@ async fn autocomplete_model(
     };
 
     let models = get_models(
-        &config.piper_server.as_ref().expect("piper server is set"),
+        config.piper_server.as_ref().expect("piper server is set"),
         &config.reqwest_client,
     )
     .await;

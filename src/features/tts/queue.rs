@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use linkify::LinkFinder;
 use reqwest::Client;
-use serde_json::error::Category;
 use serenity::{
     all::{content_safe, Cache, ContentSafeOptions, Http, Message},
     futures::lock::Mutex,
@@ -125,10 +124,8 @@ async fn get_author_name(
     }
 
     // try guild nickname
-    if let Ok(m) = message.member((cache, http)).await {
-        if let Some(nick) = m.nick {
-            return nick;
-        }
+    if let Ok(m) = message.member((cache, http)).await && let Some(nick) = m.nick {
+        return nick;
     }
 
     // global nickname

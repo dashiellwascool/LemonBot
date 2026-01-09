@@ -1,5 +1,5 @@
 use poise::CreateReply;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use songbird::input::{Input, codecs::get_codec_registry};
 use symphonia::default::get_probe;
 
@@ -54,17 +54,23 @@ async fn get_models(server: &str, client: &reqwest::Client) -> anyhow::Result<Ve
     Ok(voices)
 }
 
+#[derive(Deserialize)]
+struct GetSpeakers {
+    model: String,
+    speakers: Vec<String>
+}
+
 async fn get_speakers(
     server: &str,
     client: &reqwest::Client,
     model: Option<String>,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<GetSpeakers> {
     let url = match model {
         Some(model) => format!("{server}/speakers?model={model}"),
         None => format!("{server}/speakers"),
     };
     let resp = client.get(url).send().await?;
-    let voices: Vec<String> = resp.json().await?;
+    let voices = resp.json().await?;
 
     Ok(voices)
 }
