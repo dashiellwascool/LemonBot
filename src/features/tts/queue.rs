@@ -1,7 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use linkify::LinkFinder;
 use reqwest::Client;
-use serenity::{all::Http, futures::lock::Mutex, prelude::TypeMapKey};
+use serde_json::error::Category;
+use serenity::{
+    all::{Cache, ContentSafeOptions, Http, content_safe},
+    futures::lock::Mutex,
+    prelude::TypeMapKey,
+};
 use songbird::{Songbird, id::GuildId};
 use sqlx::{Pool, Postgres};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -25,6 +31,7 @@ pub struct TTSMessage {
     pub message: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn speak_message_queue(
     songbird: Arc<Songbird>,
     client: Arc<Client>,
@@ -33,6 +40,7 @@ pub(super) async fn speak_message_queue(
     tts_url: String,
     db: Arc<Pool<Postgres>>,
     http: Arc<Http>,
+    cache: Arc<Cache>,
 ) {
     info!("Starting message queue for {guild_id}");
 
@@ -47,6 +55,22 @@ pub(super) async fn speak_message_queue(
             error!("could not get songbird for {guild_id}");
             continue;
         };
+
+        // proces sand clean the message
+        let content: String = LinkFinder::new()
+            .spans(&message.message)
+            .filter(|s| s.kind().is_none())
+            .map(|s| s.as_str())
+            .collect();
+
+        let has_link = content != message.message;
+
+        let content = content_safe(
+            &cache,
+            content,
+            &ContentSafeOptions::new().display_as_member_from(message.guild),
+            &[],
+        );
 
         // get all the info we need
         let user = match get_tts_user(&db, message.author_id).await {
@@ -67,15 +91,26 @@ pub(super) async fn speak_message_queue(
             };
 
         // create the audio
-        let mut author_prefix = format!("{} said. ", author_name);
-        if let Some(last_author) = &last_author
-            && *last_author == author_name
-        {
-            author_prefix = String::new();
-        }
-        last_author = Some(author_name);
+        let message = {
+            if content.is_empty() && has_link {
+                format!("{} sent a link.", author_name)
+            } else {
+                let mut author_prefix = format!("{} said. ", author_name);
+                if let Some(last_author) = &last_author
+                    && *last_author == author_name
+                {
+                    author_prefix = String::new();
+                }
+                last_author = Some(author_name);
 
-        let message = format!("{}{}", author_prefix, message.message);
+                format!(
+                    "{}{}{}",
+                    author_prefix,
+                    content,
+                    if has_link { " and sent a link." } else { "" }
+                )
+            }
+        };
         let tts = match get_tts(&message, user.model, user.speaker, &tts_url, &client).await {
             Ok(i) => i,
             Err(e) => {

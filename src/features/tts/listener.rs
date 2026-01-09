@@ -3,6 +3,7 @@ use serenity::{
     async_trait,
     prelude::*,
 };
+use tracing::info;
 
 use crate::{
     config::Config,
@@ -17,7 +18,7 @@ pub struct TTSListener;
 impl EventHandler for TTSListener {
     async fn message(&self, ctx: Context, message: Message) {
         // do not read tts from bots
-        if message.author.bot {
+        if message.author.bot || message.content.is_empty() {
             return;
         }
 
