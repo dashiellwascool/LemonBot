@@ -24,7 +24,7 @@ pub async fn make_db_pool(config: &Config) -> anyhow::Result<Pool<Postgres>> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(60))
-        .connect(&config.postgres_url)
+        .connect(config.postgres_url.as_ref().expect("The URL must be some"))
         .await?;
 
     Ok(pool)

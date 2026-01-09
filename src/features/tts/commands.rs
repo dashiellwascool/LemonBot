@@ -142,7 +142,7 @@ pub async fn set_model(
 
     // get model list
     if let Some(model) = &model {
-        let models = get_models(&config.piper_server, &config.reqwest_client).await?;
+        let models = get_models(&config.piper_server.as_ref().expect("piper server is set"), &config.reqwest_client).await?;
         if !models.contains(model) {
             ctx.send(make_ephemeral_reply("That isn't a valid model"))
                 .await?;
@@ -167,7 +167,7 @@ async fn autocomplete_model(
             .clone()
     };
 
-    let models = get_models(&config.piper_server, &config.reqwest_client).await;
+    let models = get_models(&config.piper_server.as_ref().expect("piper server is set"), &config.reqwest_client).await;
 
     match models {
         Err(e) => {
@@ -207,7 +207,7 @@ pub async fn set_speaker(
     if let Some(speaker) = &speaker {
         let user = database::get_tts_user(&db, ctx.author().id.get()).await?;
         let speakers =
-            get_speakers(&config.piper_server, &config.reqwest_client, user.model).await?;
+            get_speakers(config.piper_server.as_ref().expect("piper server is set"), &config.reqwest_client, user.model).await?;
 
         if !speakers.contains(speaker) {
             ctx.send(make_ephemeral_reply("That isn't a valid speaker"))
@@ -244,7 +244,7 @@ async fn autocomplete_speaker(
         }
     };
 
-    let speakers = get_speakers(&config.piper_server, &config.reqwest_client, user.model).await;
+    let speakers = get_speakers(&config.piper_server.as_ref().expect("piper server is set"), &config.reqwest_client, user.model).await;
 
     match speakers {
         Err(e) => {

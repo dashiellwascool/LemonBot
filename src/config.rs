@@ -15,9 +15,9 @@ pub struct Config {
     pub squawk_blacklist_channels: Vec<u64>,
 
     pub tts_channels: Vec<u64>,
-    pub piper_server: String,
+    pub piper_server: Option<String>,
 
-    pub postgres_url: String,
+    pub postgres_url: Option<String>,
     pub reqwest_client: Arc<Client>
 }
 
@@ -36,8 +36,8 @@ impl Config {
             random_squawk_channels: var_list("RANDOM_SQUAWK_CHANNELS")?,
             squawk_blacklist_channels: var_list("SQUAWK_BLACKLIST_CHANNELS")?,
             tts_channels: var_list("TTS_CHANNELS")?,
-            piper_server: var_or_default("PIPER_SERVER", || "http://localhost:5000".to_string())?,
-            postgres_url: var_or_secret("POSTGRES_URL", "POSTGRES_URL_SECRET_PATH")?,
+            piper_server: var_or_none("PIPER_SERVER")?,
+            postgres_url: optional_var_or_secret("POSTGRES_URL", "POSTGRES_URL_SECRET_PATH")?,
             reqwest_client: Arc::new(Client::new())
         })
     }
@@ -65,6 +65,42 @@ fn var_list<T: DeserializeOwned>(var: &str) -> Result<Vec<T>, ConfigError> {
     } else {
         Ok(Vec::new())
     }
+}
+
+fn var_or_none<T: DeserializeOwned>(var: &str) -> Result<Option<T>, ConfigError> {
+    if let Ok(s) = env::var(var) {
+        match serde_json::from_str(&s) {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Err(ConfigError::BadVar(var.to_string()))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn optional_var_or_secret<T: FromStr>(var: &str, secret_var: &str) -> Result<Option<T>, ConfigError> {
+    if let Ok(s) = env::var(var) {
+        if let Ok(t) = T::from_str(&s) {
+            return Ok(Some(t));
+        } else {
+            return Err(ConfigError::BadVar(var.to_string()))
+        }
+    }
+
+    if let Ok(s) = env::var(secret_var) {
+        match fs::read_to_string(&s) {
+            Ok(file) => { 
+                if let Ok(t) = T::from_str(&file) {
+                    return Ok(Some(t));
+                } else {
+                    return Err(ConfigError::BadSecret(s))
+                }
+            },
+            Err(e) => return Err(ConfigError::SecretIO(e))
+        }
+    }
+
+    Ok(None)
 }
 
 fn var_or_secret<T: FromStr>(var: &str, secret_var: &str) -> Result<T, ConfigError> {

@@ -36,7 +36,7 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
         config.reqwest_client.clone(),
         rx,
         guild,
-        config.piper_server.clone(),
+        config.piper_server.as_ref().expect("piper server is set").clone(),
         db,
         ctx.http.clone()
     ));
