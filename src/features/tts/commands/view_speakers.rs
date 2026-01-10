@@ -12,7 +12,7 @@ use tracing::error;
 use crate::{
     config::Config,
     database::{self, DatabaseKey},
-    features::tts::{PoiseContext, get_speakers},
+    features::tts::{get_speakers, make_ephemeral_reply, PoiseContext},
 };
 
 pub struct ViewSpeakersListener;
@@ -66,7 +66,10 @@ impl EventHandler for ViewSpeakersListener {
 
 #[poise::command(slash_command)]
 pub async fn view_speakers(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
-    let (embed, components) = make_embed(ctx.serenity_context(), ctx.author().id.get(), 0).await?;
+    let Ok((embed, components)) = make_embed(ctx.serenity_context(), ctx.author().id.get(), 0).await else {
+        ctx.send(make_ephemeral_reply("Failed to get the speaker list. Try resetting your model with `/set_model` ?")).await?; // TODO: do this automatically
+        return Ok(());
+    };
     ctx.send(
         CreateReply::default()
             .embed(embed)

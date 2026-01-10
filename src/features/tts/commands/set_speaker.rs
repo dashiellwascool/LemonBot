@@ -20,12 +20,16 @@ pub async fn set_speaker(
 
     if let Some(speaker) = &speaker {
         let user = database::get_tts_user(&db, ctx.author().id.get()).await?;
-        let speakers = get_speakers(
+        let Ok(speakers) = get_speakers(
             config.piper_server.as_ref().expect("piper server is set"),
             &config.reqwest_client,
-            user.model,
+            user.model.clone(),
         )
-        .await?;
+        .await else {
+            error!("failed to get speaker list for model {:?}", user.model);
+            ctx.send(make_ephemeral_reply("Failed to get the speaker list. Try resetting your model with `/set_model` ?")).await?;
+            return Ok(());
+        };
 
         if !speakers.speakers.contains(speaker) {
             ctx.send(make_ephemeral_reply("That isn't a valid speaker"))

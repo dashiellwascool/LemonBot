@@ -7,14 +7,14 @@ use serenity::{
     futures::lock::Mutex,
     prelude::TypeMapKey,
 };
-use songbird::{Songbird, id::GuildId};
-use sqlx::{Pool, Postgres};
+use songbird::{id::GuildId, input::Input, Songbird};
+use sqlx::{PgPool, Pool, Postgres};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info};
 
 use crate::{
-    database::{TTSUser, get_tts_user},
-    features::tts::get_tts,
+    database::{self, get_tts_user, TTSUser},
+    features::tts::{get_tts, GetTTSError},
 };
 
 pub struct TTSSenders;
@@ -76,7 +76,7 @@ pub(super) async fn speak_message_queue(
         let author_name = get_author_name(&cache, &http, &user, &message).await;
 
         // create the audio
-        let message = {
+        let text = {
             if content.is_empty() && has_link {
                 format!("{} sent a link.", author_name)
             } else {
@@ -96,7 +96,7 @@ pub(super) async fn speak_message_queue(
                 )
             }
         };
-        let tts = match get_tts(&message, user.model, user.speaker, &tts_url, &client).await {
+        let tts = match get_tts_with_fallback(&text, user.model, user.speaker, &tts_url, &client, message.author.id.get(), &db).await {
             Ok(i) => i,
             Err(e) => {
                 error!("Error getting tts message! {e}");
@@ -107,6 +107,31 @@ pub(super) async fn speak_message_queue(
         // play the audio
         let mut handle = lock.lock().await;
         handle.enqueue_input(tts).await;
+    }
+}
+
+async fn get_tts_with_fallback(
+    msg: &str,
+    model: Option<String>,
+    speaker: Option<String>,
+    server: &str,
+    client: &reqwest::Client,
+    user_id: u64,
+    db: &Pool<Postgres>
+) -> anyhow::Result<Input> {
+    match get_tts(msg, model, speaker, server, client).await {
+        Ok(i) => Ok(i),
+        Err(e) => match e {
+            GetTTSError::Piper(e) => {
+                if e.error_code == 1 { // bad model
+                    // reset the user's model
+                    database::set_model(db, user_id, None).await?;
+                    return Ok(get_tts(msg, None, None, server, client).await?)
+                }
+                Err(e.into())
+            },
+            e => Err(e.into())
+        }
     }
 }
 
