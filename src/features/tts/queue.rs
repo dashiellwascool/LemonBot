@@ -4,18 +4,18 @@ use linkify::LinkFinder;
 use regex::{Regex, RegexBuilder};
 use reqwest::Client;
 use serenity::{
-    all::{content_safe, Cache, ContentSafeOptions, Http, Message},
+    all::{Cache, ContentSafeOptions, Http, Message, content_safe},
     futures::lock::Mutex,
     prelude::TypeMapKey,
 };
-use songbird::{id::GuildId, input::Input, Songbird};
+use songbird::{Songbird, id::GuildId, input::Input};
 use sqlx::{Pool, Postgres};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info};
 
 use crate::{
-    database::{self, get_tts_user, TTSUser},
-    features::tts::{get_tts, GetTTSError},
+    database::{self, TTSUser, get_tts_user},
+    features::tts::{GetTTSError, get_tts},
 };
 
 pub struct TTSSenders;
@@ -24,17 +24,55 @@ impl TypeMapKey for TTSSenders {
     type Value = Arc<Mutex<HashMap<GuildId, Sender<Message>>>>;
 }
 
-pub struct TTSReplacements;
-impl TypeMapKey for TTSReplacements {
-    type Value = Arc<[(Regex, &'static str)]>;
+pub struct TTSReplacements {
+    replacements: [(Regex, &'static str); 3],
+    emoji_capture: Regex,
+    unicode_emoji: Regex,
 }
 
-pub fn get_replacements() -> anyhow::Result<Arc<[(Regex, &'static str)]>> {
-    Ok(Arc::new([
-        ( RegexBuilder::new(r"```(.*?)```").dot_matches_new_line(true).build()?, " |code block| " ),
-        ( RegexBuilder::new(r"`(.*?)`").dot_matches_new_line(true).build()?, " |code block|" ),
-        ( RegexBuilder::new(r"\|\|(.*?)\|\|").dot_matches_new_line(true).build()?, " |spoilers| " ),
-    ]))
+impl TTSReplacements {
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(TTSReplacements {
+            replacements: [
+                (
+                    RegexBuilder::new(r"```(.*?)```")
+                        .dot_matches_new_line(true)
+                        .build()?,
+                    " |code block| ",
+                ),
+                (
+                    RegexBuilder::new(r"`(.*?)`")
+                        .dot_matches_new_line(true)
+                        .build()?,
+                    " |code block|",
+                ),
+                (
+                    RegexBuilder::new(r"\|\|(.*?)\|\|")
+                        .dot_matches_new_line(true)
+                        .build()?,
+                    " |spoilers| ",
+                ),
+            ],
+            emoji_capture: Regex::new(r"<(a?):(.*?):\d+>")?,
+            unicode_emoji: Regex::new(r"\p{Emoji}")?,
+        })
+    }
+}
+
+impl TypeMapKey for TTSReplacements {
+    type Value = Arc<TTSReplacements>;
+}
+
+pub struct QueueContext {
+    pub songbird: Arc<Songbird>,
+    pub client: Arc<Client>,
+    pub rx: Receiver<Message>,
+    pub guild_id: GuildId,
+    pub tts_url: String,
+    pub db: Arc<Pool<Postgres>>,
+    pub http: Arc<Http>,
+    pub cache: Arc<Cache>,
+    pub replacements: Arc<TTSReplacements>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -47,7 +85,7 @@ pub(super) async fn speak_message_queue(
     db: Arc<Pool<Postgres>>,
     http: Arc<Http>,
     cache: Arc<Cache>,
-    replacements: Arc<[(Regex, &str)]>
+    replacements: Arc<TTSReplacements>,
 ) {
     info!("Starting message queue for {guild_id}");
 
@@ -66,11 +104,42 @@ pub(super) async fn speak_message_queue(
         // process and clean the message
         // clean code blocks
         let mut pre_link_content = message.content.to_string();
-        for (regex, str) in replacements.iter() {
+        for (regex, str) in replacements.replacements.iter() {
             pre_link_content = regex.replace_all(&pre_link_content, *str).into();
         }
 
-        info!("{pre_link_content}");
+        // clean discord emojis
+        pre_link_content = replacements
+            .emoji_capture
+            .replace_all(&pre_link_content, |capture: &regex::Captures<'_>| {
+                let is_animated = capture.get(1).expect("there are two groups").as_str();
+                let emoji_name = capture.get(2).expect("there are two groups").as_str();
+
+                info!("{:?}", capture);
+
+                let emoji_type = if is_animated.is_empty() {
+                    "emoji"
+                } else {
+                    "animated emoji"
+                };
+
+                format!(" {emoji_name} {emoji_type} ")
+            })
+            .into();
+
+        // clean unicode emojis
+        pre_link_content = replacements
+            .unicode_emoji
+            .replace_all(&pre_link_content, |capture: &regex::Captures<'_>| {
+                let emoji = capture.get(0).expect("there is one group").as_str();
+
+                if let Some(emoji) = emojis::get(emoji) {
+                    format!(" {} emoji ", emoji.name())
+                } else {
+                    String::from(" emoji ")
+                }
+            })
+            .into();
 
         // clean links
         let content: String = LinkFinder::new()
@@ -84,7 +153,8 @@ pub(super) async fn speak_message_queue(
         let content = content_safe(
             &cache,
             content,
-            &ContentSafeOptions::new().display_as_member_from(message.guild_id.expect("we are in a guild")),
+            &ContentSafeOptions::new()
+                .display_as_member_from(message.guild_id.expect("we are in a guild")),
             &[],
         );
 
@@ -98,6 +168,13 @@ pub(super) async fn speak_message_queue(
         };
 
         let author_name = get_author_name(&cache, &http, &user, &message).await;
+
+        // check for an image or file
+        let mut has_image = false;
+        let mut has_file = false;
+        for attachment in message.attachments {
+            info!("{:?}", attachment.content_type);
+        }
 
         // create the audio
         let text = {
@@ -113,14 +190,26 @@ pub(super) async fn speak_message_queue(
                 last_author = Some(author_name);
 
                 format!(
-                    "{}{}{}",
+                    "{}{}{}{}{}",
                     author_prefix,
                     content,
-                    if has_link { " and sent a link." } else { "" }
+                    if has_link { " and sent a link" } else { "" },
+                    if has_image { " and sent an image" } else { "" },
+                    if has_file { " and sent a file" } else { "" }
                 )
             }
         };
-        let tts = match get_tts_with_fallback(&text, user.model, user.speaker, &tts_url, &client, message.author.id.get(), &db).await {
+        let tts = match get_tts_with_fallback(
+            &text,
+            user.model,
+            user.speaker,
+            &tts_url,
+            &client,
+            message.author.id.get(),
+            &db,
+        )
+        .await
+        {
             Ok(i) => i,
             Err(e) => {
                 error!("Error getting tts message! {e}");
@@ -134,6 +223,14 @@ pub(super) async fn speak_message_queue(
     }
 }
 
+async fn clean_replacements(ctx: &QueueContext, message: String) -> String {
+    let mut message = message.to_string();
+    for (regex, str) in ctx.replacements.replacements.iter() {
+        message = regex.replace_all(&message, *str).into();
+    }
+    message
+}
+
 async fn get_tts_with_fallback(
     msg: &str,
     model: Option<String>,
@@ -141,21 +238,22 @@ async fn get_tts_with_fallback(
     server: &str,
     client: &reqwest::Client,
     user_id: u64,
-    db: &Pool<Postgres>
+    db: &Pool<Postgres>,
 ) -> anyhow::Result<Input> {
     match get_tts(msg, model, speaker, server, client).await {
         Ok(i) => Ok(i),
         Err(e) => match e {
             GetTTSError::Piper(e) => {
-                if e.error_code == 1 { // bad model
+                if e.error_code == 1 {
+                    // bad model
                     // reset the user's model
                     database::set_model(db, user_id, None).await?;
-                    return Ok(get_tts(msg, None, None, server, client).await?)
+                    return Ok(get_tts(msg, None, None, server, client).await?);
                 }
                 Err(e.into())
-            },
-            e => Err(e.into())
-        }
+            }
+            e => Err(e.into()),
+        },
     }
 }
 
@@ -165,7 +263,7 @@ async fn get_author_name(
     cache: &Arc<Cache>,
     http: &Http,
     tts_user: &TTSUser,
-    message: &Message
+    message: &Message,
 ) -> String {
     // try TTS nickname
     if let Some(nick) = &tts_user.nick {
@@ -173,7 +271,9 @@ async fn get_author_name(
     }
 
     // try guild nickname
-    if let Ok(m) = message.member((cache, http)).await && let Some(nick) = m.nick {
+    if let Ok(m) = message.member((cache, http)).await
+        && let Some(nick) = m.nick
+    {
         return nick;
     }
 

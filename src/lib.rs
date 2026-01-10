@@ -15,7 +15,7 @@ use crate::{
     database::{make_db_pool, migrate_db, DatabaseKey},
     features::{
         squawk::SquawkListener,
-        tts::{self, listener::TTSListener, queue::{get_replacements, TTSReplacements, TTSSenders}},
+        tts::{self, listener::TTSListener, queue::{TTSReplacements, TTSSenders}},
     },
     save_data::SaveData,
 };
@@ -56,7 +56,8 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
                     tts::commands::set_model(),
                     tts::commands::set_speaker(),
                     tts::commands::view_models(),
-                    tts::commands::view_speakers()
+                    tts::commands::view_speakers(),
+                    tts::commands::stop()
                 ],
                 ..Default::default()
             })
@@ -95,7 +96,7 @@ pub async fn start_bot(config: Config) -> anyhow::Result<()> {
 
             data.insert::<TTSSenders>(Default::default());
             data.insert::<DatabaseKey>(Arc::new(db));
-            data.insert::<TTSReplacements>(get_replacements()?);
+            data.insert::<TTSReplacements>(Arc::new(TTSReplacements::new()?));
         }
 
         // everything else

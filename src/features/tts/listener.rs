@@ -3,7 +3,6 @@ use serenity::{
     async_trait,
     prelude::*,
 };
-use tracing::info;
 
 use crate::{
     config::Config,
@@ -18,7 +17,7 @@ pub struct TTSListener;
 impl EventHandler for TTSListener {
     async fn message(&self, ctx: Context, message: Message) {
         // do not read tts from bots
-        if message.author.bot || message.content.is_empty() {
+        if message.author.bot {
             return;
         }
 
@@ -29,8 +28,6 @@ impl EventHandler for TTSListener {
             return;
         }
         .clone();
-
-        info!("{} {:?}", message.author.name, message.author.global_name);
 
         // get songbird
         let songbird = songbird::get(&ctx)
