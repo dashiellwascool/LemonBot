@@ -15,7 +15,7 @@ use crate::{
     database::{make_db_pool, migrate_db, DatabaseKey},
     features::{
         squawk::SquawkListener,
-        tts::{self, listener::TTSListener, queue::{TTSReplacements, TTSSenders}},
+        tts::{self, listener::TTSListener, queue::{replacements::TTSReplacements, TTSSenders}},
     },
     save_data::SaveData,
 };

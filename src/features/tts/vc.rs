@@ -5,7 +5,7 @@ use thiserror::Error;
 use serenity::{all::Message, prelude::*};
 use tokio::sync::mpsc;
 
-use crate::{config::Config, database::DatabaseKey, features::tts::queue::{self, TTSReplacements, TTSSenders}};
+use crate::{config::Config, database::DatabaseKey, features::tts::queue::{replacements::TTSReplacements, SpeakQueue, TTSSenders}};
 
 pub async fn get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx).await.expect("Songbird is already initialized")
@@ -34,17 +34,19 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
     };
 
     let (tx, rx) = mpsc::channel::<Message>(10);
-    tokio::task::spawn(queue::speak_message_queue(
-        songbird.clone(),
-        config.reqwest_client.clone(),
+
+    // start queue
+    tokio::task::spawn(SpeakQueue {
+        songbird: songbird.clone(),
+        client: config.reqwest_client.clone(),
         rx,
-        guild,
-        config.piper_server.as_ref().expect("piper server is set").clone(),
+        guild_id: guild,
+        tts_url: config.piper_server.as_ref().expect("piper server is set").clone(),
         db,
-        ctx.http.clone(),
-        ctx.cache.clone(),
-        replacements
-    ));
+        http: ctx.http.clone(),
+        cache: ctx.cache.clone(),
+        replacements,
+    }.run());
 
     // put the sender in the senders map
     {
