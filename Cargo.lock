@@ -1476,6 +1476,7 @@ dependencies = [
  "linkify",
  "poise",
  "rand 0.9.2",
+ "regex",
  "reqwest 0.13.1",
  "ron",
  "serde",

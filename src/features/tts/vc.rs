@@ -5,7 +5,7 @@ use thiserror::Error;
 use serenity::{all::Message, prelude::*};
 use tokio::sync::mpsc;
 
-use crate::{config::Config, database::DatabaseKey, features::tts::queue::{self, TTSSenders}};
+use crate::{config::Config, database::DatabaseKey, features::tts::queue::{self, TTSReplacements, TTSSenders}};
 
 pub async fn get_songbird(ctx: &Context) -> Arc<Songbird> {
     songbird::get(ctx).await.expect("Songbird is already initialized")
@@ -15,7 +15,7 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
     let songbird = get_songbird(ctx).await;
 
     // initialize the queue
-    let (senders_lock, config, db) = {
+    let (senders_lock, config, db, replacements) = {
         let data = ctx.data.read().await;
         (
             data.get::<TTSSenders>()
@@ -26,6 +26,9 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
                 .clone(),
             data.get::<DatabaseKey>()
                 .expect("Database has been initialized")
+                .clone(),
+            data.get::<TTSReplacements>()
+                .expect("Replacements should be initialized")
                 .clone()
         )
     };
@@ -39,7 +42,8 @@ pub async fn join_vc(ctx: &Context, guild: GuildId, channel: ChannelId) -> anyho
         config.piper_server.as_ref().expect("piper server is set").clone(),
         db,
         ctx.http.clone(),
-        ctx.cache.clone()
+        ctx.cache.clone(),
+        replacements
     ));
 
     // put the sender in the senders map

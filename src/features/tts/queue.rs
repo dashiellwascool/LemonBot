@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use linkify::LinkFinder;
+use regex::{Regex, RegexBuilder};
 use reqwest::Client;
 use serenity::{
     all::{content_safe, Cache, ContentSafeOptions, Http, Message},
@@ -8,7 +9,7 @@ use serenity::{
     prelude::TypeMapKey,
 };
 use songbird::{id::GuildId, input::Input, Songbird};
-use sqlx::{PgPool, Pool, Postgres};
+use sqlx::{Pool, Postgres};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info};
 
@@ -23,6 +24,19 @@ impl TypeMapKey for TTSSenders {
     type Value = Arc<Mutex<HashMap<GuildId, Sender<Message>>>>;
 }
 
+pub struct TTSReplacements;
+impl TypeMapKey for TTSReplacements {
+    type Value = Arc<[(Regex, &'static str)]>;
+}
+
+pub fn get_replacements() -> anyhow::Result<Arc<[(Regex, &'static str)]>> {
+    Ok(Arc::new([
+        ( RegexBuilder::new(r"```(.*?)```").dot_matches_new_line(true).build()?, " |code block| " ),
+        ( RegexBuilder::new(r"`(.*?)`").dot_matches_new_line(true).build()?, " |code block|" ),
+        ( RegexBuilder::new(r"\|\|(.*?)\|\|").dot_matches_new_line(true).build()?, " |spoilers| " ),
+    ]))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn speak_message_queue(
     songbird: Arc<Songbird>,
@@ -33,6 +47,7 @@ pub(super) async fn speak_message_queue(
     db: Arc<Pool<Postgres>>,
     http: Arc<Http>,
     cache: Arc<Cache>,
+    replacements: Arc<[(Regex, &str)]>
 ) {
     info!("Starting message queue for {guild_id}");
 
@@ -48,14 +63,23 @@ pub(super) async fn speak_message_queue(
             continue;
         };
 
-        // proces sand clean the message
+        // process and clean the message
+        // clean code blocks
+        let mut pre_link_content = message.content.to_string();
+        for (regex, str) in replacements.iter() {
+            pre_link_content = regex.replace_all(&pre_link_content, *str).into();
+        }
+
+        info!("{pre_link_content}");
+
+        // clean links
         let content: String = LinkFinder::new()
-            .spans(&message.content)
+            .spans(&pre_link_content)
             .filter(|s| s.kind().is_none())
             .map(|s| s.as_str())
             .collect();
 
-        let has_link = content != message.content;
+        let has_link = content != pre_link_content;
 
         let content = content_safe(
             &cache,

@@ -4,7 +4,6 @@ use poise::CreateReply;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use songbird::input::{codecs::get_codec_registry, Input, MakePlayableError};
-use sqlx::{Pool, Postgres};
 use symphonia::default::get_probe;
 use thiserror::Error;
 
