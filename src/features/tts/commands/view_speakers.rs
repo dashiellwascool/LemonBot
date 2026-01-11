@@ -12,7 +12,7 @@ use tracing::error;
 use crate::{
     config::Config,
     database::{self, DatabaseKey},
-    features::tts::{get_speakers, make_ephemeral_reply, PoiseContext},
+    features::tts::{PoiseContext, get_speakers, make_ephemeral_reply},
 };
 
 pub struct ViewSpeakersListener;
@@ -66,8 +66,13 @@ impl EventHandler for ViewSpeakersListener {
 
 #[poise::command(slash_command)]
 pub async fn view_speakers(ctx: PoiseContext<'_>) -> Result<(), anyhow::Error> {
-    let Ok((embed, components)) = make_embed(ctx.serenity_context(), ctx.author().id.get(), 0).await else {
-        ctx.send(make_ephemeral_reply("Failed to get the speaker list. Try resetting your model with `/set_model` ?")).await?; // TODO: do this automatically
+    let Ok((embed, components)) =
+        make_embed(ctx.serenity_context(), ctx.author().id.get(), 0).await
+    else {
+        ctx.send(make_ephemeral_reply(
+            "Failed to get the speaker list. Try resetting your model with `/set_model` ?",
+        ))
+        .await?; // TODO: do this automatically
         return Ok(());
     };
     ctx.send(
@@ -107,7 +112,9 @@ async fn make_embed(
     )
     .await?;
 
-    let mut page_text = String::new();
+    let mut page_text = String::from(
+        "[You can hear demos of the models here!](https://rhasspy.github.io/piper-samples/) If you want a model added, tell my owner!\n\n",
+    );
     let mut total_pages = 0;
     let mut real_page = 0;
     if !speakers.speakers.is_empty() {
@@ -122,20 +129,29 @@ async fn make_embed(
             page_text += "\n";
         }
     } else {
-        page_text = "There are no speakers for this model.".to_string();
+        page_text = "**There are no speakers for this model.** Hint: you can use `/set_model` to select a different model. Also, [You can hear demos of the models here!](https://rhasspy.github.io/piper-samples/) If you want a model added, tell my owner!".to_string();
     }
 
-    let next_button_id = serde_json::to_string(&ButtonId { page: real_page as i32 + 1 })?;
-    let prev_button_id = serde_json::to_string(&ButtonId { page: real_page as i32 - 1 })?;
+    let next_button_id = serde_json::to_string(&ButtonId {
+        page: real_page as i32 + 1,
+    })?;
+    let prev_button_id = serde_json::to_string(&ButtonId {
+        page: real_page as i32 - 1,
+    })?;
 
     let components = CreateActionRow::Buttons(vec![
         CreateButton::new(format!("view_speakers {}", prev_button_id)).emoji('◀'),
-        CreateButton::new(format!("view_speakers {}", next_button_id)).emoji('▶')
+        CreateButton::new(format!("view_speakers {}", next_button_id)).emoji('▶'),
     ]);
 
     Ok((
         CreateEmbed::new()
-            .title(format!("Speaker List for {} ({}/{})", speakers.model, (real_page + 1).min(total_pages), total_pages))
+            .title(format!(
+                "Speaker List for {} ({}/{})",
+                speakers.model,
+                (real_page + 1).min(total_pages),
+                total_pages
+            ))
             .description(page_text)
             .color(15844367),
         components,

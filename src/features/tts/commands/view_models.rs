@@ -69,7 +69,7 @@ async fn make_embed(ctx: &Context, page: i32) -> Result<(CreateEmbed, CreateActi
 
     models.sort();
 
-    let mut page_text = String::new();
+    let mut page_text = String::from("[You can hear demos of the models here!](https://rhasspy.github.io/piper-samples/) If you want a model added, tell my owner!\n\n");
     let iter = models.iter();
     for model in iter.skip(page * PAGE_SIZE).take(PAGE_SIZE) {
         page_text += "- ";
