@@ -1,7 +1,7 @@
 use serenity::all::AutocompleteChoice;
 use tracing::error;
 
-use crate::{config::Config, database::{self, DatabaseKey}, features::tts::{get_speakers, make_ephemeral_reply, PoiseContext}};
+use crate::{config::Config, database::{self, DatabaseKey}, features::tts::{make_ephemeral_reply, piper::get_speakers, PoiseContext}};
 
 #[poise::command(slash_command)]
 pub async fn set_speaker(

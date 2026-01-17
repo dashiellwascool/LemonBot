@@ -12,7 +12,7 @@ use tracing::error;
 use crate::{
     config::Config,
     database::{self, DatabaseKey},
-    features::tts::{PoiseContext, get_speakers, make_ephemeral_reply},
+    features::tts::{make_ephemeral_reply, piper::get_speakers, PoiseContext},
 };
 
 pub struct ViewSpeakersListener;

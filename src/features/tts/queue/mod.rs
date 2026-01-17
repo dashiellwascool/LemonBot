@@ -13,8 +13,8 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info};
 
 use crate::{
-    database::{self, TTSUser, get_tts_user},
-    features::tts::{GetTTSError, get_tts, queue::replacements::TTSReplacements},
+    database::{self, get_tts_user, TTSUser},
+    features::tts::{piper::{get_tts, GetTTSError}, queue::replacements::TTSReplacements},
 };
 
 pub mod replacements;

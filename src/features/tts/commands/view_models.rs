@@ -5,7 +5,7 @@ use tracing::error;
 
 use crate::{
     config::Config,
-    features::tts::{PoiseContext, get_models},
+    features::tts::{piper::get_models, PoiseContext},
 };
 
 pub struct ViewModelsListener;
